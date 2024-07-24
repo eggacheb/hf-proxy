@@ -11,24 +11,42 @@ const pickHeaders = (headers: Headers, keys: (string | RegExp)[]): Headers => {
   return picked;
 };
 
+const CORS_HEADERS: Record<string, string> = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "access-control-allow-headers": "Content-Type, Authorization",
+};
+
 export default async function handleRequest(req: Request & { nextUrl?: URL }) {
-  const { pathname, search } = req.nextUrl ? req.nextUrl : new URL(req.url);
-  const url = new URL(pathname + search, "https://eggacheb-fast.hf.space").href;
-  const headers = pickHeaders(req.headers, ["content-type", "authorization"]);
-
-  const fetchOptions: RequestInit = {
-    method: req.method,
-    headers,
-  };
-
-  if (req.method !== "GET" && req.method !== "HEAD") {
-    fetchOptions.body = req.body;
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      headers: CORS_HEADERS,
+    });
   }
 
-  const res = await fetch(url, fetchOptions);
+  const { pathname, search } = req.nextUrl ? req.nextUrl : new URL(req.url);
+  const url = new URL(pathname + search, "https://eggacheb-fast.hf.space").href;
+
+  // Clone the request headers
+  const headers = new Headers();
+  req.headers.forEach((value, key) => {
+    headers.append(key, value);
+  });
+
+  const res = await fetch(url, {
+    body: req.body,
+    method: req.method,
+    headers,
+  });
+
+  // Clone the response headers
+  const resHeaders = new Headers(res.headers);
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    resHeaders.set(key, value);
+  }
 
   return new Response(res.body, {
-    headers: res.headers,
+    headers: resHeaders,
     status: res.status,
   });
 }
