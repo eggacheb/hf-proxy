@@ -25,36 +25,29 @@ export default async function handleRequest(req: Request & { nextUrl?: URL }) {
   }
 
   const { pathname, search } = req.nextUrl ? req.nextUrl : new URL(req.url);
-  const hostname = req.nextUrl ? req.nextUrl.hostname : new URL(req.url).hostname;
-  
-  // Update the base URL to point to the new target
-  const targetHostname = "eggacheb-fast.hf.space";
-  const url = new URL(pathname + search, `https://${targetHostname}`).href;
-  const headers = pickHeaders(req.headers, ["content-type", "authorization"]);
-  
-  // Create a new request with the updated URL and set the origin header
-  const modifiedReq = new Request(url, req);
-  modifiedReq.headers.set('origin', `https://${targetHostname}/`);
-  
-  const res = await fetch(modifiedReq);
-  let newRes = new Response(res.body, res);
+  const targetUrl = new URL(pathname + search, "https://eggacheb-chuanhuchatgpt.hf.space").href;
 
-  // Update the location header in the response if it exists
-  let location = newRes.headers.get('location');
-  if (location !== null && location !== "") {
-    location = location.replace(`://${targetHostname}`, `://${hostname}`);
-    newRes.headers.set('location', location);
+  const modifiedRequest = new Request(targetUrl, req);
+  modifiedRequest.headers.set('origin', 'https://eggacheb-chuanhuchatgpt.hf.space/');
+
+  const response = await fetch(modifiedRequest);
+  let modifiedResponse = new Response(response.body, response);
+
+  const location = modifiedResponse.headers.get('location');
+  if (location) {
+    const updatedLocation = location.replace('://eggacheb-chuanhuchatgpt.hf.space', `://${req.headers.get('host')}`);
+    modifiedResponse.headers.set('location', updatedLocation);
   }
 
   const resHeaders = {
     ...CORS_HEADERS,
     ...Object.fromEntries(
-      pickHeaders(newRes.headers, ["content-type", /^x-ratelimit-/, /^openai-/])
+      pickHeaders(modifiedResponse.headers, ["content-type", /^x-ratelimit-/, /^openai-/])
     ),
   };
 
-  return new Response(newRes.body, {
+  return new Response(modifiedResponse.body, {
     headers: resHeaders,
-    status: newRes.status
+    status: modifiedResponse.status
   });
 }
