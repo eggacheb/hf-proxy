@@ -25,28 +25,36 @@ export default async function handleRequest(req: Request & { nextUrl?: URL }) {
   }
 
   const { pathname, search } = req.nextUrl ? req.nextUrl : new URL(req.url);
-  const _url = new URL(pathname + search, "https://eggacheb-fast.hf.space");
+  const hostname = req.nextUrl ? req.nextUrl.hostname : new URL(req.url).hostname;
   
-  // Create a new request with the updated URL
-  const proxiedReq = new Request(_url, req);
-  proxiedReq.headers.set('origin', 'https://eggacheb-fast.hf.space');
-  
-  // Adjust headers to be proxied
+  // Update the base URL to point to the new target
+  const targetHostname = "eggacheb-fast.hf.space";
+  const url = new URL(pathname + search, `https://${targetHostname}`).href;
   const headers = pickHeaders(req.headers, ["content-type", "authorization"]);
-  headers.forEach((value, key) => proxiedReq.headers.set(key, value));
-
-  const res = await fetch(proxiedReq);
-  let newRes = new Response(res.body, res);
   
-  // Set CORS headers on the response
-  Object.entries(CORS_HEADERS).forEach(([key, value]) => newRes.headers.set(key, value));
+  // Create a new request with the updated URL and set the origin header
+  const modifiedReq = new Request(url, req);
+  modifiedReq.headers.set('origin', `https://${targetHostname}/`);
+  
+  const res = await fetch(modifiedReq);
+  let newRes = new Response(res.body, res);
 
-  // Handle location header if present
+  // Update the location header in the response if it exists
   let location = newRes.headers.get('location');
-  if (location) {
-    location = location.replace('://eggacheb-fast.hf.space', `://${req.headers.get('host')}`);
+  if (location !== null && location !== "") {
+    location = location.replace(`://${targetHostname}`, `://${hostname}`);
     newRes.headers.set('location', location);
   }
 
-  return newRes;
+  const resHeaders = {
+    ...CORS_HEADERS,
+    ...Object.fromEntries(
+      pickHeaders(newRes.headers, ["content-type", /^x-ratelimit-/, /^openai-/])
+    ),
+  };
+
+  return new Response(newRes.body, {
+    headers: resHeaders,
+    status: newRes.status
+  });
 }
