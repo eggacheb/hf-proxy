@@ -25,29 +25,34 @@ export default async function handleRequest(req: Request & { nextUrl?: URL }) {
   }
 
   const { pathname, search } = req.nextUrl ? req.nextUrl : new URL(req.url);
-  const targetUrl = new URL(pathname + search, "https://eggacheb-chuanhuchatgpt.hf.space").href;
+  const _url = new URL(pathname + search, "https://eggacheb-chuanhuchatgpt.hf.space");
+  const headers = pickHeaders(req.headers, ["content-type", "authorization"]);
+  
+  // Set the origin header to the target URL
+  headers.set('origin', 'https://eggacheb-chuanhuchatgpt.hf.space');
 
-  const modifiedRequest = new Request(targetUrl, req);
-  modifiedRequest.headers.set('origin', 'https://eggacheb-chuanhuchatgpt.hf.space/');
+  const res = await fetch(new Request(_url.href, {
+    body: req.body,
+    method: req.method,
+    headers,
+  }));
 
-  const response = await fetch(modifiedRequest);
-  let modifiedResponse = new Response(response.body, response);
+  let newres = new Response(res.body, {
+    headers: {
+      ...CORS_HEADERS,
+      ...Object.fromEntries(
+        pickHeaders(res.headers, ["content-type", /^x-ratelimit-/, /^openai-/])
+      ),
+    },
+    status: res.status,
+  });
 
-  const location = modifiedResponse.headers.get('location');
-  if (location) {
-    const updatedLocation = location.replace('://eggacheb-chuanhuchatgpt.hf.space', `://${req.headers.get('host')}`);
-    modifiedResponse.headers.set('location', updatedLocation);
+  // Adjust the location header if present
+  let location = newres.headers.get('location');
+  if (location !== null && location !== "") {
+    location = location.replace('://eggacheb-chuanhuchatgpt.hf.space', '://' + (req.nextUrl ? req.nextUrl.hostname : new URL(req.url).hostname));
+    newres.headers.set('location', location);
   }
 
-  const resHeaders = {
-    ...CORS_HEADERS,
-    ...Object.fromEntries(
-      pickHeaders(modifiedResponse.headers, ["content-type", /^x-ratelimit-/, /^openai-/])
-    ),
-  };
-
-  return new Response(modifiedResponse.body, {
-    headers: resHeaders,
-    status: modifiedResponse.status
-  });
+  return newres;
 }
