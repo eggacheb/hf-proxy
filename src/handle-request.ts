@@ -25,36 +25,28 @@ export default async function handleRequest(req: Request & { nextUrl?: URL }) {
   }
 
   const { pathname, search } = req.nextUrl ? req.nextUrl : new URL(req.url);
-  // Update the base URL to point to the new target
-  const url = new URL(pathname + search, "https://eggacheb-fast.hf.space").href;
+  const _url = new URL(pathname + search, "https://eggacheb-fast.hf.space");
+  
+  // Create a new request with the updated URL
+  const proxiedReq = new Request(_url, req);
+  proxiedReq.headers.set('origin', 'https://eggacheb-fast.hf.space');
+  
+  // Adjust headers to be proxied
   const headers = pickHeaders(req.headers, ["content-type", "authorization"]);
+  headers.forEach((value, key) => proxiedReq.headers.set(key, value));
 
-  try {
-    const res = await fetch(url, {
-      body: req.body,
-      method: req.method,
-      headers,
-    });
+  const res = await fetch(proxiedReq);
+  let newRes = new Response(res.body, res);
+  
+  // Set CORS headers on the response
+  Object.entries(CORS_HEADERS).forEach(([key, value]) => newRes.headers.set(key, value));
 
-    const resHeaders = {
-      ...CORS_HEADERS,
-      ...Object.fromEntries(
-        pickHeaders(res.headers, ["content-type", /^x-ratelimit-/, /^openai-/, /^hf-/]) // Adjust header patterns if necessary
-      ),
-    };
-
-    const responseBody = await res.text(); // Read response as text to avoid streaming issues
-
-    return new Response(responseBody, {
-      headers: resHeaders,
-      status: res.status,
-    });
-  } catch (error) {
-    // Assert error as Error type to access its properties
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(`Error fetching the request: ${errorMessage}`, {
-      headers: CORS_HEADERS,
-      status: 500,
-    });
+  // Handle location header if present
+  let location = newRes.headers.get('location');
+  if (location) {
+    location = location.replace('://eggacheb-fast.hf.space', `://${req.headers.get('host')}`);
+    newRes.headers.set('location', location);
   }
+
+  return newRes;
 }
