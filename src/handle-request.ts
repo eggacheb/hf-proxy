@@ -1,16 +1,3 @@
-const pickHeaders = (headers: Headers, keys: (string | RegExp)[]): Headers => {
-  const picked = new Headers();
-  for (const key of headers.keys()) {
-    if (keys.some((k) => (typeof k === "string" ? k === key : k.test(key)))) {
-      const value = headers.get(key);
-      if (typeof value === "string") {
-        picked.set(key, value);
-      }
-    }
-  }
-  return picked;
-};
-
 const CORS_HEADERS: Record<string, string> = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -25,8 +12,9 @@ export default async function handleRequest(req: Request & { nextUrl?: URL }) {
   }
 
   const { pathname, search } = req.nextUrl ? req.nextUrl : new URL(req.url);
+  // Update the base URL to point to the new target
   const url = new URL(pathname + search, "https://eggacheb-fast.hf.space").href;
-  const headers = pickHeaders(req.headers, ["content-type", "authorization"]);
+  const headers = new Headers(req.headers); // Forward all request headers
 
   const res = await fetch(url, {
     body: req.body,
@@ -34,12 +22,10 @@ export default async function handleRequest(req: Request & { nextUrl?: URL }) {
     headers,
   });
 
-  const resHeaders = {
-    ...CORS_HEADERS,
-    ...Object.fromEntries(
-      pickHeaders(res.headers, ["content-type", /^x-ratelimit-/, /^openai-/])
-    ),
-  };
+  const resHeaders = new Headers(res.headers);
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    resHeaders.set(key, value); // Add CORS headers to the response
+  }
 
   return new Response(res.body, {
     headers: resHeaders,
