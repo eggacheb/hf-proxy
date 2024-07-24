@@ -50,7 +50,9 @@ export default async function handleRequest(req: Request & { nextUrl?: URL }) {
       status: res.status,
     });
   } catch (error) {
-    return new Response(`Error fetching the request: ${error.message}`, {
+    // Assert error as Error type to access its properties
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(`Error fetching the request: ${errorMessage}`, {
       headers: CORS_HEADERS,
       status: 500,
     });
