@@ -24,30 +24,35 @@ export default async function handleRequest(req: Request & { nextUrl?: URL }) {
     });
   }
 
-  const { pathname, search } = req.nextUrl ? req.nextUrl : new URL(req.url);
-  const url = new URL(pathname + search, "https://eggacheb-fast.hf.space").href;
-  const headers = pickHeaders(req.headers, ["content-type", "authorization"]);
+  try {
+    const { pathname, search } = req.nextUrl ? req.nextUrl : new URL(req.url);
+    const url = new URL(pathname + search, "https://eggacheb-fast.hf.space").href;
+    const headers = pickHeaders(req.headers, ["content-type", "authorization"]);
 
-  const fetchOptions: RequestInit = {
-    method: req.method,
-    headers,
-  };
+    const res = await fetch(url, {
+      body: req.body,
+      method: req.method,
+      headers,
+    });
 
-  if (req.method !== "GET" && req.method !== "HEAD") {
-    fetchOptions.body = req.body;
+    const resHeaders = {
+      ...CORS_HEADERS,
+      ...Object.fromEntries(
+        pickHeaders(res.headers, ["content-type", /^x-ratelimit-/, /^openai-/])
+      ),
+    };
+
+    const responseBody = await res.arrayBuffer();
+
+    return new Response(responseBody, {
+      headers: resHeaders,
+      status: res.status,
+      statusText: res.statusText,
+    });
+  } catch (error) {
+    return new Response("An error occurred: " + error.message, {
+      status: 500,
+      headers: CORS_HEADERS,
+    });
   }
-
-  const res = await fetch(url, fetchOptions);
-
-  const resHeaders = {
-    ...CORS_HEADERS,
-    ...Object.fromEntries(
-      pickHeaders(res.headers, ["content-type", /^x-ratelimit-/, /^openai-/])
-    ),
-  };
-
-  return new Response(res.body, {
-    headers: resHeaders,
-    status: res.status,
-  });
 }
