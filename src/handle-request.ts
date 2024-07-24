@@ -1,4 +1,4 @@
-const pickHeaders = (headers, keys) => {
+const pickHeaders = (headers: Headers, keys: (string | RegExp)[]): Headers => {
   const picked = new Headers();
   for (const key of headers.keys()) {
     if (keys.some((k) => (typeof k === "string" ? k === key : k.test(key)))) {
@@ -11,49 +11,38 @@ const pickHeaders = (headers, keys) => {
   return picked;
 };
 
-const CORS_HEADERS = {
+const CORS_HEADERS: Record<string, string> = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
   "access-control-allow-headers": "Content-Type, Authorization",
 };
 
-export default {
-  async fetch(request, env) {
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        headers: CORS_HEADERS,
-      });
-    }
-
-    const originalUrl = new URL(request.url);
-    const targetUrl = new URL(originalUrl.pathname + originalUrl.search, "https://eggacheb-fast.hf.space");
-    
-    const headers = pickHeaders(request.headers, ["content-type", "authorization"]);
-    headers.set('origin', 'https://eggacheb-fast.hf.space');
-
-    const response = await fetch(new Request(targetUrl, {
-      body: request.body,
-      method: request.method,
-      headers,
-    }));
-
-    const responseHeaders = {
-      ...CORS_HEADERS,
-      ...Object.fromEntries(
-        pickHeaders(response.headers, ["content-type", /^x-ratelimit-/, /^openai-/])
-      ),
-    };
-
-    let location = response.headers.get('location');
-    if (location) {
-      location = location.replace('://eggacheb-fast.hf.space', '://' + originalUrl.hostname);
-      responseHeaders['location'] = location;
-    }
-
-    return new Response(response.body, {
-      headers: responseHeaders,
-      status: response.status,
-      statusText: response.statusText,
+export default async function handleRequest(req: Request & { nextUrl?: URL }) {
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      headers: CORS_HEADERS,
     });
   }
-};
+
+  const { pathname, search } = req.nextUrl ? req.nextUrl : new URL(req.url);
+  const url = new URL(pathname + search, "https://eggacheb-fast.hf.space").href;
+  const headers = pickHeaders(req.headers, ["content-type", "authorization"]);
+
+  const res = await fetch(url, {
+    body: req.body,
+    method: req.method,
+    headers,
+  });
+
+  const resHeaders = {
+    ...CORS_HEADERS,
+    ...Object.fromEntries(
+      pickHeaders(res.headers, ["content-type", /^x-ratelimit-/, /^openai-/])
+    ),
+  };
+
+  return new Response(res.body, {
+    headers: resHeaders,
+    status: res.status
+  });
+}
