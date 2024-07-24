@@ -16,13 +16,21 @@ export default async function handleRequest(req: Request & { nextUrl?: URL }) {
   const url = new URL(pathname + search, "https://eggacheb-fast.hf.space").href;
   const headers = pickHeaders(req.headers, ["content-type", "authorization"]);
 
-  const res = await fetch(url, {
-    body: req.body,
+  const fetchOptions: RequestInit = {
     method: req.method,
     headers,
-  });
+  };
 
-  const resHeaders = Object.fromEntries(pickHeaders(res.headers, ["content-type", /^x-ratelimit-/, /^openai-/]));
+  // Only set body for non-GET and non-HEAD methods
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    fetchOptions.body = req.body;
+  }
+
+  const res = await fetch(url, fetchOptions);
+
+  const resHeaders = Object.fromEntries(
+    pickHeaders(res.headers, ["content-type", /^x-ratelimit-/, /^openai-/])
+  );
 
   return new Response(res.body, {
     headers: resHeaders,
