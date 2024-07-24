@@ -35,6 +35,10 @@ export default async function handleRequest(req: Request & { nextUrl?: URL }) {
       headers,
     });
 
+    if (!res.ok) {
+      throw new Error(`Fetch to ${url} failed with status ${res.status}`);
+    }
+
     const resHeaders = {
       ...CORS_HEADERS,
       ...Object.fromEntries(
@@ -50,7 +54,7 @@ export default async function handleRequest(req: Request & { nextUrl?: URL }) {
     });
   } catch (error) {
     console.error('Error in handleRequest:', error);
-    return new Response('Internal Server Error', {
+    return new Response('Resource not found or internal server error', {
       status: 500,
       headers: {
         "Content-Type": "text/plain",
