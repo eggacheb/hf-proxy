@@ -26,25 +26,25 @@ export default async function handleRequest(req: Request & { nextUrl?: URL }) {
 
   try {
     const { pathname, search } = req.nextUrl ? req.nextUrl : new URL(req.url);
-    const url = new URL(pathname + search, "https://eggacheb-fast.hf.space").href;
-    const headers = pickHeaders(req.headers, ["content-type", "authorization"]);
+    const targetUrl = new URL(pathname + search, "https://eggacheb-fast.hf.space");
 
-    const res = await fetch(url, {
+    const headers = pickHeaders(req.headers, ["content-type", "authorization", /^x-/]);
+
+    const res = await fetch(targetUrl.href, {
       body: req.body,
       method: req.method,
       headers,
     });
 
-    if (!res.ok) {
-      throw new Error(`Fetch to ${url} failed with status ${res.status}`);
-    }
-
-    const resHeaders = {
+    const resHeaders = new Headers({
       ...CORS_HEADERS,
-      ...Object.fromEntries(
-        pickHeaders(res.headers, ["content-type", /^x-ratelimit-/, /^openai-/])
-      ),
-    };
+    });
+
+    res.headers.forEach((value, key) => {
+      if (!key.startsWith('content-security-policy')) {
+        resHeaders.set(key, value);
+      }
+    });
 
     const body = await res.text();
 
@@ -54,7 +54,7 @@ export default async function handleRequest(req: Request & { nextUrl?: URL }) {
     });
   } catch (error) {
     console.error('Error in handleRequest:', error);
-    return new Response('Resource not found or internal server error', {
+    return new Response('Internal Server Error', {
       status: 500,
       headers: {
         "Content-Type": "text/plain",
