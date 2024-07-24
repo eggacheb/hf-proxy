@@ -25,11 +25,11 @@ export default async function handleRequest(req: Request & { nextUrl?: URL }) {
   }
 
   const { pathname, search } = req.nextUrl ? req.nextUrl : new URL(req.url);
-  const _url = new URL(pathname + search, "https://eggacheb-chuanhuchatgpt.hf.space");
+  const _url = new URL(pathname + search, "https://eggacheb-fast.hf.space");
   const headers = pickHeaders(req.headers, ["content-type", "authorization"]);
   
   // Set the origin header to the target URL
-  headers.set('origin', 'https://eggacheb-chuanhuchatgpt.hf.space');
+  headers.set('origin', 'https://eggacheb-fast.hf.space');
 
   const res = await fetch(new Request(_url.href, {
     body: req.body,
@@ -50,7 +50,7 @@ export default async function handleRequest(req: Request & { nextUrl?: URL }) {
   // Adjust the location header if present
   let location = newres.headers.get('location');
   if (location !== null && location !== "") {
-    location = location.replace('://eggacheb-chuanhuchatgpt.hf.space', '://' + (req.nextUrl ? req.nextUrl.hostname : new URL(req.url).hostname));
+    location = location.replace('://eggacheb-fast.hf.space', '://' + (req.nextUrl ? req.nextUrl.hostname : new URL(req.url).hostname));
     newres.headers.set('location', location);
   }
 
